@@ -802,12 +802,33 @@ void VoodooI2CControllerDriver::transferMessageToBus() {
     writeRegister(interrupt_mask, DW_IC_INTR_MASK);
 }
 
+IOReturn VoodooI2CControllerDriver::abortTransferI2C() {
+    int timeout = 100;
+    writeRegister(0x1 | DW_IC_ENABLE_ABORT, DW_IC_ENABLE);
+    while (readRegister(DW_IC_ENABLE) & DW_IC_ENABLE_ABORT) {
+        if (timeout-- <= 0) {
+            IOLog("%s::%s Warning: Timeout waiting for transfer abort to complete\n", getName(), bus_device.name);
+            break;
+        }
+        IODelay(100);
+    }
+    readRegister(DW_IC_CLR_TX_ABRT);
+    toggleBusState(kVoodooI2CStateOff);
+    return kIOReturnSuccess;
+}
+
 IOReturn VoodooI2CControllerDriver::waitBusNotBusyI2C() {
     int timeout = TIMEOUT * 150, firstDelay = 100;
 
     while (readRegister(DW_IC_STATUS) & DW_IC_STATUS_ACTIVITY) {
         if (timeout <= 0) {
             IOLog("%s::%s Warning: Timeout waiting for bus not to be busy\n", getName(), bus_device.name);
+            abortTransferI2C();
+            for (int settle = 0; settle < 50; settle++) {
+                if (!(readRegister(DW_IC_STATUS) & DW_IC_STATUS_ACTIVITY))
+                    return kIOReturnSuccess;
+                IODelay(100);
+            }
             return kIOReturnBusy;
         }
         timeout--;

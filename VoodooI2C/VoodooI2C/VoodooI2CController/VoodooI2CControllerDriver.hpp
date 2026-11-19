@@ -295,6 +295,7 @@ class EXPORT VoodooI2CControllerDriver : public IOService {
      */
 
     IOReturn waitBusNotBusyI2C();
+    IOReturn abortTransferI2C();
 
     /* Register and enable the interrupt for I2C bus
      *

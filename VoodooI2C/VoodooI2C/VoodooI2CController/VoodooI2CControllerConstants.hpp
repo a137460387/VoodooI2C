@@ -65,6 +65,7 @@
 #define DW_IC_SDA_HOLD 0x7c
 #define DW_IC_TX_ABRT_SOURCE 0x80
 #define DW_IC_ENABLE_STATUS 0x9c
+#define DW_IC_ENABLE_ABORT (1UL << 1)
 #define DW_IC_CLR_RESTART_DET 0xa8
 #define DW_IC_COMP_PARAM_1 0xf4
 #define DW_IC_COMP_VERSION 0xf8
