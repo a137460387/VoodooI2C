@@ -18,6 +18,7 @@ void VoodooI2CPCIController::configurePCI() {
 
     pci_device->setBusMasterEnable(true);
     pci_device->setMemoryEnable(true);
+    physical_device.pci_device->setProperty("VI2C-diag-pmcsr-after-d0", physical_device.pci_device->configRead32(0x84), 32);
 }
 
 IOReturn VoodooI2CPCIController::getACPIDevice() {
@@ -84,11 +85,31 @@ bool VoodooI2CPCIController::start(IOService* provider) {
 
     configurePCI();
 
+    // 强制 I2C 控制器从 D3 回到 D0(本机 enablePCIPowerManagement(D0) 无效,直接写 PMCSR)
+    UInt32 pmcsr = physical_device.pci_device->configRead32(0x84);
+    provider->setProperty("VI2C-diag-d0fix-pmcsr-pre", pmcsr, 32);
+    if ((pmcsr & 0x3) != 0) {
+        physical_device.pci_device->configWrite32(0x84, pmcsr & ~0x3u);  // 低2位清0 = D0,其余位保留
+        IOSleep(10);  // D3hot→D0 需要时间稳定
+        UInt32 pmcsr_post = physical_device.pci_device->configRead32(0x84);
+        provider->setProperty("VI2C-diag-d0fix-pmcsr-post", pmcsr_post, 32);
+    }
+
+    UInt32 pmcsr_before = physical_device.pci_device->configRead32(0x84);
+    provider->setProperty("VI2C-diag-pmcsr-before", pmcsr_before, 32);
+
     if (mapMemory() != kIOReturnSuccess) {
         IOLog("%s::%s Could not map memory\n", getName(), physical_device.name);
         return false;
     }
 
+    UInt64 va = physical_device.mmap->getVirtualAddress();
+    UInt32 comptype_now = *(volatile UInt32*)(va + 0xfc);  // DW_IC_COMP_TYPE
+    provider->setProperty("VI2C-diag-d0fix-comptype", comptype_now, 32);
+
+    provider->setProperty("VI2C-diag-bar0-phys", physical_device.mmap->getPhysicalAddress(), 64);
+    provider->setProperty("VI2C-diag-bar0-len",  physical_device.mmap->getLength(), 64);
+    provider->setProperty("VI2C-diag-bar0-virt", physical_device.mmap->getVirtualAddress(), 64);
     skylakeLPSSResetHack();
 
     if (publishNub() != kIOReturnSuccess) {
