@@ -103,7 +103,6 @@ bool VoodooI2CControllerNub::start(IOService* provider) {
 
     registerService();
 
-    this->setProperty("VI2C-diag-nub", "nub-started");
     return true;
 }
 

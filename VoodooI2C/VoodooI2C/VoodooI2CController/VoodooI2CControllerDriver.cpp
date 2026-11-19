@@ -329,9 +329,7 @@ IOReturn VoodooI2CControllerDriver::prepareTransferI2C(VoodooI2CControllerBusMes
 VoodooI2CControllerDriver* VoodooI2CControllerDriver::probe(IOService* provider, SInt32* score) {
     UInt32 reg;
 
-    provider->setProperty("VI2C-diag-probe", "probe-entered");
     if (!super::probe(provider, score)) {
-        provider->setProperty("VI2C-diag-probe", "FAILED-super-probe");
         return NULL;
     }
 
@@ -339,7 +337,6 @@ VoodooI2CControllerDriver* VoodooI2CControllerDriver::probe(IOService* provider,
 
     if (!nub) {
         IOLog("%s::%s VoodooI2CControllerNub not found\n", getName(), bus_device.name);
-        provider->setProperty("VI2C-diag-probe", "FAILED-nub-cast");
         return NULL;
     }
 
@@ -347,23 +344,15 @@ VoodooI2CControllerDriver* VoodooI2CControllerDriver::probe(IOService* provider,
 
     IOLog("%s::%s Probing controller\n", getName(), bus_device.name);
 
-    provider->setProperty("VI2C-diag-comptype", readRegister(DW_IC_COMP_TYPE), 32);
-    provider->setProperty("VI2C-diag-compver",  readRegister(DW_IC_COMP_VERSION), 32);
-    provider->setProperty("VI2C-diag-compparam",readRegister(DW_IC_COMP_PARAM_1), 32);
-    provider->setProperty("VI2C-diag-ic-con",   readRegister(DW_IC_CON), 32);
-    provider->setProperty("VI2C-diag-ic-enable",readRegister(DW_IC_ENABLE), 32);
     reg = readRegister(DW_IC_COMP_TYPE);
 
     if (reg == DW_IC_COMP_TYPE_VALUE) {
         IOLog("%s::%s Found valid Synopsys component, continuing with initialisation\n", getName(), bus_device.name);
     } else {
         IOLog("%s::%s Unknown Synopsys component type: 0x%08x\n", getName(), bus_device.name, reg);
-        provider->setProperty("VI2C-diag-probe", "FAILED-comp-type");
-        provider->setProperty("VI2C-diag-comptype", reg, 32);
         return NULL;
     }
 
-    provider->setProperty("VI2C-diag-probe", "probe-ok");
     return this;
 }
 
@@ -566,7 +555,6 @@ IOReturn VoodooI2CControllerDriver::setPowerState(unsigned long whichState, IOSe
 bool VoodooI2CControllerDriver::start(IOService* provider) {
     if (!super::start(provider))
         return false;
-    nub->setProperty("VI2C-diag-stage", "start-entered");
     i2c_bus_lock = IOLockAlloc();
     if (!i2c_bus_lock) {
         IOLog("%s::%s Could not allocate I2C bus lock\n", getName(), bus_device.name);
@@ -613,18 +601,14 @@ bool VoodooI2CControllerDriver::start(IOService* provider) {
         bus_device.bus_config |= DW_IC_CON_BUS_CLEAR_CTRL;
     }
 
-    nub->setProperty("VI2C-diag-stage", "before-initialiseBus");
     if (initialiseBus() != kIOReturnSuccess) {
         IOLog("%s::%s Could not initialise bus\n", getName(), bus_device.name);
-        nub->setProperty("VI2C-diag-stage", "FAILED-initialiseBus");
         return false;
     }
 
-    nub->setProperty("VI2C-diag-stage", "initialiseBus-ok");
     toggleInterrupts(kVoodooI2CStateOff);
 
     if (startI2CInterrupt() != kIOReturnSuccess) {
-        nub->setProperty("VI2C-diag-stage", "FAILED-startI2CInterrupt");
         goto exit;
     }
 
@@ -632,10 +616,8 @@ bool VoodooI2CControllerDriver::start(IOService* provider) {
 
     registerService();
 
-    nub->setProperty("VI2C-diag-stage", "before-publishNubs");
     publishNubs();
 
-    nub->setProperty("VI2C-diag-stage", "start-success");
     return true;
 exit:
     releaseResources();
@@ -680,7 +662,6 @@ IOReturn VoodooI2CControllerDriver::toggleBusState(VoodooI2CState enabled) {
     } while (timeout--);
 
     IOLog("%s::%s Timed out waiting for bus to change state\n", getName(), bus_device.name);
-    nub->setProperty("VI2C-diag-toggleBusState", "timeout");
     return kIOReturnTimeout;
 }
 
